@@ -2,10 +2,12 @@
 
 ## Small Program for Raspberry zero
 
-# Compiling
+### Compiling
 
 Install gcc:
+
 $ sudo apt-get install g++
 
 Compile source code:
+
 g++ TrailCamera.cpp -o Tcamera.out
