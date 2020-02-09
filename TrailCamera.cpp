@@ -67,7 +67,7 @@ int main(void)
 		if(event)
 		{
 			event = false;
-			std::string picCommand = "raspistill -md 2 -o /home/pi/" + CurrentTime() + ".jpg";
+			std::string picCommand = "sudo raspistill -md 2 -o /media/usb/" + CurrentTime() + ".jpg";
 			std::cout<<picCommand<<std::endl;
 
 			if(ReadNightI2C(fd))
