@@ -7,18 +7,27 @@
 #include<wiringPiI2C.h>
 
 #define DETECT_PIN 0	//	logical pin 11 GPIO 17
+#define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
 #define IR_LED_PIN 7	//	logical pin 7 GPIO 4
 
 bool event = false;
 bool night = false;
-static unsigned long last_interrupt_time = 0;
+static unsigned long last_interrupt_time_detect = 0;
+static unsigned long last_interrupt_time_shutdown = 0;
+
+//	Return control to startup script
+void InterruptShutdown(void)
+{
+	std::cout<<"BYE BYE"<<std::endl;
+	exit(1);
+}
 
 void InterruptDetect(void)
 {
 	unsigned long interrupt_time = millis();
-	if(interrupt_time - last_interrupt_time > 50)
+	if(interrupt_time - last_interrupt_time_detect > 50)
 		event = true;
-	last_interrupt_time = interrupt_time;
+	last_interrupt_time_detect = interrupt_time;
 }
 
 std::string CurrentTime(void)
@@ -92,6 +101,7 @@ int main(void)
 
 	wiringPiSetup();
 	wiringPiISR(DETECT_PIN, INT_EDGE_RISING, &InterruptDetect);
+	wiringPiISR(SHUTDOWN_PIN, INT_EDGE_RISING, &InterruptShutdown);
 	pinMode(IR_LED_PIN,OUTPUT);
 
 	int fd = wiringPiI2CSetup(0x10);
