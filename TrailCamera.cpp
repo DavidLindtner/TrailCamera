@@ -52,6 +52,40 @@ bool ReadNightI2C(int fd)
 		return true;
 }
 
+void VideoCapture()
+{
+	std::string CurrTime[20];
+	int videoCounter = 0;
+	std::string picCommand = "sudo raspistill -md 2 -o /media/usb/" + CurrentTime() + ".jpg";
+
+	std::cout<<"Taking photo ..."<<std::endl;
+	system(picCommand.c_str());
+
+
+	do{
+		event = false;
+		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 5 -t 5000";
+		CurrTime[videoCounter] = CurrentTime();
+		videoCounter++;
+
+		std::cout<<"Capturing video ..."<<std::endl;
+		system(vidCommand.c_str());
+	}while(event);
+
+
+	for(int i = 0; i < videoCounter; i++)
+	{
+		std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /media/usb/" + CurrTime[i] + ".mp4";
+		std::string vidDelCommand = "rm /home/pi/" + std::to_string(i) + ".h264";
+
+		std::cout<<"Converting video ..."<<std::endl;
+		system(vidExportCommand.c_str());
+		std::cout<<"Deleting video ..."<<std::endl;
+		system(vidDelCommand.c_str());
+	}
+
+}
+
 int main(void)
 {
 	std::cout<<"Program started"<<std::endl;
@@ -62,26 +96,29 @@ int main(void)
 
 	int fd = wiringPiI2CSetup(0x10);
 
+	int videoCounter = 0;
+
 	while(true)
 	{
 		if(event)
 		{
 			event = false;
-			std::string picCommand = "sudo raspistill -md 2 -o /media/usb/" + CurrentTime() + ".jpg";
-			std::cout<<picCommand<<std::endl;
+			videoCounter++;
 
 			if(ReadNightI2C(fd))
 			{
 				digitalWrite(IR_LED_PIN,HIGH);
-				system(picCommand.c_str());
+				VideoCapture();
 				digitalWrite(IR_LED_PIN,LOW);
 			}
 			else
 			{
-				system(picCommand.c_str());
+				VideoCapture();
 			}
 		}
+		usleep(100000);
 	}
 
 	return 0;
 }
+
