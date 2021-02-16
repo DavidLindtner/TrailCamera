@@ -18,12 +18,13 @@ case "$1" in
 		;;
 	*)
 		echo "Mounting USB"
-		sudo mount /dev/sda1 /media/usb
+		sudo mount /dev/sda1 /mnt/usb
 		#sudo chown -R pi:pi /media/usb
 		echo "Starting program"
 		/home/pi/TrailCamera/./Tcamera.out
 		echo "Unmounting USB"
-		sudo umount /media/usb
+		sudo umount /mnt/usb
+		sudo halt
 		;;
 esac
 

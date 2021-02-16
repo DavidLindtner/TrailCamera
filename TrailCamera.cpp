@@ -5,6 +5,7 @@
 #include<unistd.h>
 #include<wiringPi.h>
 #include<wiringPiI2C.h>
+#include<signal.h>
 
 #define DETECT_PIN 0	//	logical pin 11 GPIO 17
 #define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
@@ -14,6 +15,16 @@ bool event = false;
 bool night = false;
 static unsigned long last_interrupt_time_detect = 0;
 static unsigned long last_interrupt_time_shutdown = 0;
+
+int fd;
+
+double batteryVoltage = 0;
+double lightVoltage = 0;
+
+double batteryV [10];
+double lightV [10];
+
+bool dayLight = true;
 
 //	Return control to startup script
 void InterruptShutdown(void)
@@ -30,6 +41,75 @@ void InterruptDetect(void)
 	last_interrupt_time_detect = interrupt_time;
 }
 
+double Median(double arr[10])
+{
+	double tmp = 0;
+	double tmpArr[10];
+	for(int i = 0; i < 9; i++)
+	{
+		for(int j = 0; j < 9-i; j++)
+		{
+			tmp = arr[j+1];
+			tmpArr[j+1] = arr[j];
+			tmpArr[j] = tmp;
+		}
+	}
+	return (tmpArr[4] + tmpArr[5])/2;
+}
+
+void readI2C(int s)
+{
+	int data = 0;
+	if(wiringPiI2CWrite(fd, 0x00) < 0)
+		std::cout<<"Error writing I2C"<<std::endl;
+	data = wiringPiI2CRead(fd);
+	if(data < 0)
+		std::cout<<"Error reading I2C"<<std::endl;
+	else
+	{
+		for(int i = 9; i > 0; i--)
+			batteryV[i] = batteryV[i-1];
+		batteryV[0] = double(data)*0.0728;
+	}
+
+
+	if(wiringPiI2CWrite(fd, 0x01) < 0)
+		std::cout<<"Error writing I2C"<<std::endl;
+	data = wiringPiI2CRead(fd);
+	if(data < 0)
+		std::cout<<"Error reading I2C"<<std::endl;
+	else
+	{
+		for(int i = 9; i > 0; i--)
+			lightV[i] = lightV[i-1];
+		lightV[0] = double(data)*0.0132;
+	}
+
+	batteryVoltage = Median(batteryV);
+	lightVoltage = Median(lightV);
+
+	if(lightVoltage > 0.5)
+		dayLight = false;
+	else
+		dayLight = true;
+
+
+	std::cout<<"Battery arr:";
+	for(int i = 0; i < 10; i++)
+		std::cout<<batteryV[i]<< " " ;
+
+	std::cout<<std::endl<<"Light arr:";
+	for(int i = 0; i < 10; i++)
+		std::cout<<lightV[i]<< " ";
+
+	std::cout<<std::endl<<"Battery: "<<batteryVoltage<<" V"<<std::endl;
+	std::cout<<std::endl<<"Light: "<<lightVoltage<<" V"<<std::endl;
+
+	std::cout<<"Day: "<<dayLight<<std::endl<<std::endl;
+
+	alarm(1);
+}
+
 std::string CurrentTime(void)
 {
 	char buff [30];
@@ -40,32 +120,12 @@ std::string CurrentTime(void)
 	return (retVal);
 }
 
-bool ReadNightI2C(int fd)
-{
-	if(wiringPiI2CWrite(fd, 0x00) < 0)
-	{
-		std::cout<<"Error writing I2C"<<std::endl;
-		return false;
-	}
-
-	int data = wiringPiI2CRead(fd);
-	
-	if(data < 0)
-	{
-		std::cout<<"Error reading I2C"<<std::endl;
-		return false;
-	}
-	else if(data == 0)
-		return false;
-	else
-		return true;
-}
 
 void VideoCapture()
 {
 	std::string CurrTime[20];
 	int videoCounter = 0;
-	std::string picCommand = "sudo raspistill -md 2 -o /media/usb/" + CurrentTime() + ".jpg";
+	std::string picCommand = "sudo raspistill -md 2 -o /mnt/usb/" + CurrentTime() + ".jpg";
 
 	std::cout<<"Taking photo ..."<<std::endl;
 	system(picCommand.c_str());
@@ -84,7 +144,7 @@ void VideoCapture()
 
 	for(int i = 0; i < videoCounter; i++)
 	{
-		std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /media/usb/" + CurrTime[i] + ".mp4";
+		std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /mnt/usb/" + CurrTime[i] + ".mp4";
 		std::string vidDelCommand = "rm /home/pi/" + std::to_string(i) + ".h264";
 
 		std::cout<<"Converting video ..."<<std::endl;
@@ -99,12 +159,21 @@ int main(void)
 {
 	std::cout<<"Program started"<<std::endl;
 
+	for(int i = 0; i < 10; i++)
+	{
+		batteryV[i] = 12;
+		lightV[i] = 0.1;
+	}
+
 	wiringPiSetup();
 	wiringPiISR(DETECT_PIN, INT_EDGE_RISING, &InterruptDetect);
 	wiringPiISR(SHUTDOWN_PIN, INT_EDGE_RISING, &InterruptShutdown);
 	pinMode(IR_LED_PIN,OUTPUT);
 
-	int fd = wiringPiI2CSetup(0x10);
+	fd = wiringPiI2CSetup(0x37);
+
+	signal(SIGALRM, readI2C);
+	alarm(5);
 
 	int videoCounter = 0;
 
@@ -115,18 +184,18 @@ int main(void)
 			event = false;
 			videoCounter++;
 
-			if(ReadNightI2C(fd))
+			if(dayLight)
+			{
+				VideoCapture();
+			}
+			else
 			{
 				digitalWrite(IR_LED_PIN,HIGH);
 				VideoCapture();
 				digitalWrite(IR_LED_PIN,LOW);
 			}
-			else
-			{
-				VideoCapture();
-			}
 		}
-		usleep(100000);
+		usleep(1E5);
 	}
 
 	return 0;
