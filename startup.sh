@@ -21,7 +21,7 @@ case "$1" in
 		sudo mount /dev/sda1 /media/usb
 		#sudo chown -R pi:pi /media/usb
 		echo "Starting program"
-		/home/pi/Program/TrailCamera/./Tcamera.out
+		/home/pi/TrailCamera/./Tcamera.out
 		echo "Unmounting USB"
 		sudo umount /media/usb
 		;;
