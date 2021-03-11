@@ -10,6 +10,7 @@
 #define DETECT_PIN 0	//	logical pin 11 GPIO 17
 #define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
 #define IR_LED_PIN 7	//	logical pin 7 GPIO 4
+#define SHUTDOWN_VOLTAGE 9
 
 bool event = false;
 bool night = false;
@@ -93,21 +94,24 @@ void readI2C(int s)
 	else
 		dayLight = true;
 
+	if(batteryVoltage < SHUTDOWN_VOLTAGE)
+	{
+		std::cout<<"LOW BATTERY - SHUTTING DOWN"<<std::endl;
+		exit(1);
+	}
+	//std::cout<<"Battery arr:";
+	//for(int i = 0; i < 10; i++)
+	//	std::cout<<batteryV[i]<< " " ;
 
-	std::cout<<"Battery arr:";
-	for(int i = 0; i < 10; i++)
-		std::cout<<batteryV[i]<< " " ;
-
-	std::cout<<std::endl<<"Light arr:";
-	for(int i = 0; i < 10; i++)
-		std::cout<<lightV[i]<< " ";
+	//std::cout<<std::endl<<"Light arr:";
+	//for(int i = 0; i < 10; i++)
+	//	std::cout<<lightV[i]<< " ";
 
 	std::cout<<std::endl<<"Battery: "<<batteryVoltage<<" V"<<std::endl;
-	std::cout<<std::endl<<"Light: "<<lightVoltage<<" V"<<std::endl;
-
+	std::cout<<"Light: "<<lightVoltage<<" V"<<std::endl;
 	std::cout<<"Day: "<<dayLight<<std::endl<<std::endl;
 
-	alarm(1);
+	alarm(5);
 }
 
 std::string CurrentTime(void)
