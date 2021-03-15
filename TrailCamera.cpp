@@ -6,11 +6,13 @@
 #include<wiringPi.h>
 #include<wiringPiI2C.h>
 #include<signal.h>
+#include<fstream>
 
 #define DETECT_PIN 0	//	logical pin 11 GPIO 17
 #define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
 #define IR_LED_PIN 7	//	logical pin 7 GPIO 4
-#define SHUTDOWN_VOLTAGE 9
+#define SHUTDOWN_VOLTAGE 9	// [V]
+#define VIDEO_DURATION 10	// [s]
 
 bool event = false;
 bool night = false;
@@ -27,19 +29,47 @@ double lightV [10];
 
 bool dayLight = true;
 
+char logName[30] = "/home/pi/TrailCamLog.log";
+
+
+
+std::string CurrentTime(void)
+{
+	char buff [30];
+	time_t t = time(NULL);
+	struct tm curr_time = *localtime(&t);
+	sprintf(buff, "%d_%d_%d_%d_%d_%d", curr_time.tm_year+1900, curr_time.tm_mon+1, curr_time.tm_mday, curr_time.tm_hour, curr_time.tm_min, curr_time.tm_sec);
+	std::string retVal(buff);
+	return (retVal);
+}
+
+void LogData(std::string message, bool stdOut)
+{
+	std::ofstream file;
+	file.open(logName, std::ios::app);
+	file << "[" << CurrentTime() << "]" << ": " << message << std::endl;
+	file.close();
+	if(stdOut)
+		std::cout << "[" << CurrentTime() << "]" << ": " << message << std::endl;
+}
+
 //	Return control to startup script
 void InterruptShutdown(void)
 {
-	std::cout<<"BYE BYE"<<std::endl;
+	LogData("INTERRUPT SHUTDOWN", true);
 	exit(1);
 }
 
 void InterruptDetect(void)
 {
-	unsigned long interrupt_time = millis();
-	if(interrupt_time - last_interrupt_time_detect > 50)
-		event = true;
-	last_interrupt_time_detect = interrupt_time;
+	if(!digitalRead(DETECT_PIN))
+	{
+		LogData("Detection",true);
+		unsigned long interrupt_time = millis();
+		if(interrupt_time - last_interrupt_time_detect > 500)
+			event = true;
+		last_interrupt_time_detect = interrupt_time;
+	}
 }
 
 double Median(double arr[10])
@@ -62,10 +92,10 @@ void readI2C(int s)
 {
 	int data = 0;
 	if(wiringPiI2CWrite(fd, 0x00) < 0)
-		std::cout<<"Error writing I2C"<<std::endl;
+		LogData("Error writing I2C", true);
 	data = wiringPiI2CRead(fd);
 	if(data < 0)
-		std::cout<<"Error reading I2C"<<std::endl;
+		LogData("Error reading I2C", true);
 	else
 	{
 		for(int i = 9; i > 0; i--)
@@ -73,12 +103,11 @@ void readI2C(int s)
 		batteryV[0] = double(data)*0.0728;
 	}
 
-
 	if(wiringPiI2CWrite(fd, 0x01) < 0)
-		std::cout<<"Error writing I2C"<<std::endl;
+		LogData("Error writing I2C", true);
 	data = wiringPiI2CRead(fd);
 	if(data < 0)
-		std::cout<<"Error reading I2C"<<std::endl;
+		LogData("Error reading I2C", true);
 	else
 	{
 		for(int i = 9; i > 0; i--)
@@ -89,79 +118,83 @@ void readI2C(int s)
 	batteryVoltage = Median(batteryV);
 	lightVoltage = Median(lightV);
 
-	if(lightVoltage > 0.5)
+	if(lightVoltage > 2)
 		dayLight = false;
 	else
 		dayLight = true;
 
 	if(batteryVoltage < SHUTDOWN_VOLTAGE)
 	{
-		std::cout<<"LOW BATTERY - SHUTTING DOWN"<<std::endl;
+		LogData("LOW BATTERY - SHUTDOWN", true);
 		exit(1);
 	}
-	//std::cout<<"Battery arr:";
-	//for(int i = 0; i < 10; i++)
-	//	std::cout<<batteryV[i]<< " " ;
 
-	//std::cout<<std::endl<<"Light arr:";
-	//for(int i = 0; i < 10; i++)
-	//	std::cout<<lightV[i]<< " ";
+	std::string batVoltStr = "Battery: " + std::to_string(batteryVoltage) + " V, Light " + std::to_string(lightVoltage) + " V, day: " + std::to_string(dayLight);
+	std::string lightVoltStr = "Light: " + std::to_string(lightVoltage) + " V";
+	std::string dayLightStr = "Day: " + std::to_string(dayLight) + "\n";
+	LogData(batVoltStr, true);
+	//LogData(lightVoltStr, true);
+	//LogData(dayLightStr, true);
 
-	std::cout<<std::endl<<"Battery: "<<batteryVoltage<<" V"<<std::endl;
-	std::cout<<"Light: "<<lightVoltage<<" V"<<std::endl;
-	std::cout<<"Day: "<<dayLight<<std::endl<<std::endl;
-
-	alarm(5);
+	alarm(60);
 }
 
-std::string CurrentTime(void)
-{
-	char buff [30];
-	time_t t = time(NULL);
-	struct tm curr_time = *localtime(&t);
-	sprintf(buff, "%d_%d_%d_%d_%d_%d", curr_time.tm_year+1900, curr_time.tm_mon+1, curr_time.tm_mday, curr_time.tm_hour, curr_time.tm_min, curr_time.tm_sec);
-	std::string retVal(buff);
-	return (retVal);
-}
+
 
 
 void VideoCapture()
 {
-	std::string CurrTime[20];
+	std::string CurrTime[50];
 	int videoCounter = 0;
-	std::string picCommand = "sudo raspistill -md 2 -o /mnt/usb/" + CurrentTime() + ".jpg";
+	std::string picCommand = "sudo raspistill -md 2 -o /home/pi/" + CurrentTime() + ".jpg";
 
-	std::cout<<"Taking photo ..."<<std::endl;
-	system(picCommand.c_str());
+	//LogData("Taking photo", true);
+	//system(picCommand.c_str());
 
 
 	do{
 		event = false;
-		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 5 -t 5000";
+		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 5 -t " + std::to_string(VIDEO_DURATION * 1000);
 		CurrTime[videoCounter] = CurrentTime();
 		videoCounter++;
 
-		std::cout<<"Capturing video ..."<<std::endl;
+		LogData("Capturing video ...", true);
 		system(vidCommand.c_str());
+		if(!digitalRead(DETECT_PIN))
+			event = true;
 	}while(event);
 
 
 	for(int i = 0; i < videoCounter; i++)
 	{
-		std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /mnt/usb/" + CurrTime[i] + ".mp4";
+
+		//std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /mnt/usb/" + CurrTime[i] + ".mp4";
+		std::string vidExportCommand = "MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /home/pi/" + CurrTime[i] + ".mp4";
 		std::string vidDelCommand = "rm /home/pi/" + std::to_string(i) + ".h264";
 
-		std::cout<<"Converting video ..."<<std::endl;
+		LogData("Converting video ...", true);
 		system(vidExportCommand.c_str());
-		std::cout<<"Deleting video ..."<<std::endl;
+		LogData("Deleting video ...", true);
 		system(vidDelCommand.c_str());
 	}
 
 }
 
+
+
+
 int main(void)
 {
-	std::cout<<"Program started"<<std::endl;
+	std::ifstream iFile;
+	iFile.open(logName);
+	if(iFile)
+	{
+		iFile.close();
+		remove(logName);
+	}
+	
+
+	LogData("Program started", true);
 
 	for(int i = 0; i < 10; i++)
 	{
@@ -170,7 +203,7 @@ int main(void)
 	}
 
 	wiringPiSetup();
-	wiringPiISR(DETECT_PIN, INT_EDGE_RISING, &InterruptDetect);
+	wiringPiISR(DETECT_PIN, INT_EDGE_FALLING, &InterruptDetect);
 	wiringPiISR(SHUTDOWN_PIN, INT_EDGE_RISING, &InterruptShutdown);
 	pinMode(IR_LED_PIN,OUTPUT);
 
