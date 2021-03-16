@@ -25,26 +25,25 @@ case "$1" in
 		echo "Startup script was succesfully uninstalled"
 		;;
 	*)
-		#echo "Mounting USB"
-		#sudo mount /dev/sda1 /mnt/usb
-		#sudo chown -R pi:pi /media/usb
-		#sudo /opt/vc/bin/tvservice -o
-		#sudo /opt/vc/bin/tvservice -s
 		echo "Starting program"
 		rfkill unblock wifi
-		sleep 20
+		sleep 60
 		ssidName=$(/sbin/iwgetid -r)
 		if [ "$ssidName" = "D&L" ]; then
 			echo "Connecting to wifi"
 		else
+			echo "No connection to wifi"
+			echo 0 | sudo tee /sys/class/leds/led0/brightness
+			cp /home/pi/TrailCamLog.log /home/pi/TrailCamLogOld.log
+			/usr/bin/tvservice -o
 			rfkill block wifi
-			echo "Disconecting"
+			rfkill block bluetooth
+			/home/pi/TrailCamera/./Tcamera.out
+			echo 1 | sudo tee /sys/class/leds/led0/brightness
+			rfkill unblock wifi
+			sudo halt
 		fi
-		/home/pi/TrailCamera/./Tcamera.out
-		echo "Unmounting USB"
-		#sudo umount /mnt/usb
-		rfkill unblock wifi
-		sudo halt
+
 		;;
 esac
 
