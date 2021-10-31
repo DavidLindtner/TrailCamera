@@ -31,6 +31,7 @@ bool dayLight = true;
 
 char logName[30] = "/home/pi/TrailCamLog.log";
 
+bool firstRead = true;
 
 
 std::string CurrentTime(void)
@@ -56,6 +57,8 @@ void LogData(std::string message, bool stdOut)
 //	Return control to startup script
 void InterruptShutdown(void)
 {
+
+	digitalWrite(IR_LED_PIN,LOW);
 	LogData("INTERRUPT SHUTDOWN", true);
 	exit(1);
 }
@@ -98,9 +101,18 @@ void readI2C(int s)
 		LogData("Error reading I2C", true);
 	else
 	{
-		for(int i = 9; i > 0; i--)
-			batteryV[i] = batteryV[i-1];
-		batteryV[0] = double(data)*0.0728;
+		if(firstRead)
+		{
+			for(int i = 0; i < 10; i++)
+				batteryV[i] = double(data)*0.0728;
+			
+		}
+		else
+		{
+			for(int i = 9; i > 0; i--)
+				batteryV[i] = batteryV[i-1];
+			batteryV[0] = double(data)*0.0728;
+		}
 	}
 
 	if(wiringPiI2CWrite(fd, 0x01) < 0)
@@ -110,9 +122,17 @@ void readI2C(int s)
 		LogData("Error reading I2C", true);
 	else
 	{
-		for(int i = 9; i > 0; i--)
-			lightV[i] = lightV[i-1];
-		lightV[0] = double(data)*0.0132;
+		if(firstRead)
+		{
+			for(int i = 0; i < 10; i++)
+				lightV[i] = double(data)*0.0132;
+		}
+		else
+		{
+			for(int i = 9; i > 0; i--)
+				lightV[i] = lightV[i-1];
+			lightV[0] = double(data)*0.0132;
+		}
 	}
 
 	batteryVoltage = Median(batteryV);
@@ -129,12 +149,11 @@ void readI2C(int s)
 		exit(1);
 	}
 
-	std::string batVoltStr = "Battery: " + std::to_string(batteryVoltage) + " V, Light " + std::to_string(lightVoltage) + " V, day: " + std::to_string(dayLight);
-	std::string lightVoltStr = "Light: " + std::to_string(lightVoltage) + " V";
-	std::string dayLightStr = "Day: " + std::to_string(dayLight) + "\n";
+	std::string batVoltStr = "Battery: " + std::to_string(batteryVoltage) + " V, Light " + std::to_string(lightVoltage) + " V, Day: " + std::to_string(dayLight);
 	LogData(batVoltStr, true);
-	//LogData(lightVoltStr, true);
-	//LogData(dayLightStr, true);
+	
+	if(firstRead)
+		firstRead = false;
 
 	alarm(60);
 }
@@ -157,8 +176,11 @@ void VideoCapture()
 		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 5 -t " + std::to_string(VIDEO_DURATION * 1000);
 		CurrTime[videoCounter] = CurrentTime();
 		videoCounter++;
+		if(dayLight)
+			LogData("Capturing video during day ...", true);
+		else
+			LogData("Capturing video during night ...", true);
 
-		LogData("Capturing video ...", true);
 		system(vidCommand.c_str());
 		if(!digitalRead(DETECT_PIN))
 			event = true;
@@ -195,12 +217,6 @@ int main(void)
 	
 
 	LogData("Program started", true);
-
-	for(int i = 0; i < 10; i++)
-	{
-		batteryV[i] = 12;
-		lightV[i] = 0.1;
-	}
 
 	wiringPiSetup();
 	wiringPiISR(DETECT_PIN, INT_EDGE_FALLING, &InterruptDetect);
