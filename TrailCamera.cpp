@@ -12,7 +12,7 @@
 #define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
 #define IR_LED_PIN 7	//	logical pin 7 GPIO 4
 #define SHUTDOWN_VOLTAGE 9	// [V]
-#define VIDEO_DURATION 10	// [s]
+#define VIDEO_DURATION 60	// [s]
 
 bool event = false;
 bool night = false;
