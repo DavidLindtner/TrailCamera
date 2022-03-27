@@ -34,7 +34,6 @@ case "$1" in
 		else
 			echo "No connection to wifi"
 			echo 0 | sudo tee /sys/class/leds/led0/brightness
-			cp /home/pi/TrailCamLog.log /home/pi/TrailCamLogOld.log
 			/usr/bin/tvservice -o
 			rfkill block wifi
 			rfkill block bluetooth

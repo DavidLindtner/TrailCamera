@@ -12,7 +12,7 @@
 #define SHUTDOWN_PIN 1	//	logical pin 12 GPIO 18
 #define IR_LED_PIN 7	//	logical pin 7 GPIO 4
 #define SHUTDOWN_VOLTAGE 9	// [V]
-#define VIDEO_DURATION 60	// [s]
+#define VIDEO_DURATION 10	// [s]
 
 bool event = false;
 bool night = false;
@@ -39,7 +39,7 @@ std::string CurrentTime(void)
 	char buff [30];
 	time_t t = time(NULL);
 	struct tm curr_time = *localtime(&t);
-	sprintf(buff, "%d_%02d_%02d_%02d_%02d_%02d", curr_time.tm_year+1900, curr_time.tm_mon+1, curr_time.tm_mday, curr_time.tm_hour, curr_time.tm_min, curr_time.tm_sec);
+	sprintf(buff, "%d_%d_%d_%d_%d_%d", curr_time.tm_year+1900, curr_time.tm_mon+1, curr_time.tm_mday, curr_time.tm_hour, curr_time.tm_min, curr_time.tm_sec);
 	std::string retVal(buff);
 	return (retVal);
 }
@@ -57,9 +57,11 @@ void LogData(std::string message, bool stdOut)
 //	Return control to startup script
 void InterruptShutdown(void)
 {
-
-	digitalWrite(IR_LED_PIN,LOW);
 	LogData("INTERRUPT SHUTDOWN", true);
+	LogData(" __        __ ",true);
+	LogData("|   |\\  | |  \\",true);
+	LogData("|-- | \\ | |  |",true);
+	LogData("|__ |  \\| |__/",true);
 	exit(1);
 }
 
@@ -101,18 +103,9 @@ void readI2C(int s)
 		LogData("Error reading I2C", true);
 	else
 	{
-		if(firstRead)
-		{
-			for(int i = 0; i < 10; i++)
-				batteryV[i] = double(data)*0.0728;
-			
-		}
-		else
-		{
-			for(int i = 9; i > 0; i--)
-				batteryV[i] = batteryV[i-1];
-			batteryV[0] = double(data)*0.0728;
-		}
+		for(int i = 9; i > 0; i--)
+			batteryV[i] = batteryV[i-1];
+		batteryV[0] = double(data)*0.0728;
 	}
 
 	if(wiringPiI2CWrite(fd, 0x01) < 0)
@@ -122,17 +115,9 @@ void readI2C(int s)
 		LogData("Error reading I2C", true);
 	else
 	{
-		if(firstRead)
-		{
-			for(int i = 0; i < 10; i++)
-				lightV[i] = double(data)*0.0132;
-		}
-		else
-		{
-			for(int i = 9; i > 0; i--)
-				lightV[i] = lightV[i-1];
-			lightV[0] = double(data)*0.0132;
-		}
+		for(int i = 9; i > 0; i--)
+			lightV[i] = lightV[i-1];
+		lightV[0] = double(data)*0.0132;
 	}
 
 	batteryVoltage = Median(batteryV);
@@ -146,6 +131,10 @@ void readI2C(int s)
 	if(batteryVoltage < SHUTDOWN_VOLTAGE)
 	{
 		LogData("LOW BATTERY - SHUTDOWN", true);
+		LogData(" __        __ ",true);
+		LogData("|   |\\  | |  \\",true);
+		LogData("|-- | \\ | |  |",true);
+		LogData("|__ |  \\| |__/",true);
 		exit(1);
 	}
 
@@ -209,14 +198,20 @@ int main(void)
 {
 	std::ifstream iFile;
 	iFile.open(logName);
-	if(iFile)
-	{
-		iFile.close();
-		remove(logName);
-	}
+//	if(iFile)
+//	{
+//		iFile.close();
+//		remove(logName);
+//	}
 	
 
 	LogData("Program started", true);
+
+	for(int i = 0; i < 10; i++)
+	{
+		batteryV[i] = 12;
+		lightV[i] = 0.1;
+	}
 
 	wiringPiSetup();
 	wiringPiISR(DETECT_PIN, INT_EDGE_FALLING, &InterruptDetect);
