@@ -26,8 +26,9 @@ case "$1" in
 		;;
 	*)
 		echo "Starting program"
+		sleep 5
 		rfkill unblock wifi
-		sleep 10
+		sleep 5
 		ssidName=$(/sbin/iwgetid -r)
 		if [ "$ssidName" = "D&L" ]; then
 			echo "Connecting to wifi"
