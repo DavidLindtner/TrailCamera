@@ -162,7 +162,7 @@ void VideoCapture()
 
 	do{
 		event = false;
-		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 5 -t " + std::to_string(VIDEO_DURATION * 1000);
+		std::string vidCommand = "raspivid -o /home/pi/" + std::to_string(videoCounter) + ".h264 -md 2 -t " + std::to_string(VIDEO_DURATION * 1000);
 		CurrTime[videoCounter] = CurrentTime();
 		videoCounter++;
 		if(dayLight)
@@ -180,7 +180,7 @@ void VideoCapture()
 	{
 
 		//std::string vidExportCommand = "sudo MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /mnt/usb/" + CurrTime[i] + ".mp4";
-		std::string vidExportCommand = "MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=30 /home/pi/" + CurrTime[i] + ".mp4";
+		std::string vidExportCommand = "MP4Box -add /home/pi/" + std::to_string(i) + ".h264:fps=15 /home/pi/" + CurrTime[i] + ".mp4";
 		std::string vidDelCommand = "rm /home/pi/" + std::to_string(i) + ".h264";
 
 		LogData("Converting video ...", true);
